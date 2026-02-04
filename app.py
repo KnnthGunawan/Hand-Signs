@@ -19,7 +19,15 @@ st.write(
 )
 
 
-mp_hands = mp.solutions.hands
+try:
+    mp_hands = mp.solutions.hands
+    mp_drawing = mp.solutions.drawing_utils
+except AttributeError:
+    # Fallback for environments where mediapipe doesn't expose solutions at top level
+    from mediapipe.python import solutions as mp_solutions
+
+    mp_hands = mp_solutions.hands
+    mp_drawing = mp_solutions.drawing_utils
 
 
 FINGER_TIPS = {
@@ -136,7 +144,7 @@ class HandSignProcessor(VideoProcessorBase):
             min_tracking_confidence=0.6,
             max_num_hands=2,
         )
-        self.drawer = mp.solutions.drawing_utils
+        self.drawer = mp_drawing
         self.last_states = []
         self.last_labels = []
 
