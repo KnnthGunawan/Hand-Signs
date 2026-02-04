@@ -3,7 +3,6 @@ import time
 from typing import Dict, Optional, Tuple
 
 import av
-import mediapipe as mp
 import numpy as np
 import streamlit as st
 from PIL import Image, ImageDraw
@@ -19,15 +18,10 @@ st.write(
 )
 
 
-try:
-    mp_hands = mp.solutions.hands
-    mp_drawing = mp.solutions.drawing_utils
-except AttributeError:
-    # Fallback for environments where mediapipe doesn't expose solutions at top level
-    from mediapipe.python import solutions as mp_solutions
+from mediapipe.python import solutions as mp_solutions
 
-    mp_hands = mp_solutions.hands
-    mp_drawing = mp_solutions.drawing_utils
+mp_hands = mp_solutions.hands
+mp_drawing = mp_solutions.drawing_utils
 
 
 FINGER_TIPS = {
