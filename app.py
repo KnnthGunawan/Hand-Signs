@@ -3,10 +3,10 @@ import time
 from typing import Dict, Optional, Tuple
 
 import av
-import cv2
 import mediapipe as mp
 import numpy as np
 import streamlit as st
+from PIL import Image, ImageDraw
 from streamlit_webrtc import VideoProcessorBase, webrtc_streamer
 
 
@@ -136,6 +136,28 @@ def classify_sign(landmarks) -> Optional[str]:
     return None
 
 
+def _draw_landmarks_pil(img: Image.Image, hand_landmarks) -> None:
+    draw = ImageDraw.Draw(img)
+    w, h = img.size
+    points = []
+    for lm in hand_landmarks.landmark:
+        points.append((int(lm.x * w), int(lm.y * h)))
+
+    for connection in mp_hands.HAND_CONNECTIONS:
+        start = points[connection[0]]
+        end = points[connection[1]]
+        draw.line([start, end], fill=(0, 255, 0), width=2)
+
+    for x, y in points:
+        r = 3
+        draw.ellipse((x - r, y - r, x + r, y + r), fill=(255, 0, 0))
+
+
+def _overlay_text(img: Image.Image, text: str, y: int) -> None:
+    draw = ImageDraw.Draw(img)
+    draw.text((10, y), text, fill=(255, 255, 255))
+
+
 class HandSignProcessor(VideoProcessorBase):
     def __init__(self):
         self.hands = mp_hands.Hands(
@@ -149,22 +171,16 @@ class HandSignProcessor(VideoProcessorBase):
         self.last_labels = []
 
     def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
-        img = frame.to_ndarray(format="bgr24")
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img_rgb = frame.to_ndarray(format="rgb24")
         results = self.hands.process(img_rgb)
+        img = Image.fromarray(img_rgb)
 
         self.last_states = []
         self.last_labels = []
 
         if results.multi_hand_landmarks:
             for hand_landmarks in results.multi_hand_landmarks[:2]:
-                self.drawer.draw_landmarks(
-                    img,
-                    hand_landmarks,
-                    mp_hands.HAND_CONNECTIONS,
-                    self.drawer.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
-                    self.drawer.DrawingSpec(color=(0, 0, 255), thickness=2),
-                )
+                _draw_landmarks_pil(img, hand_landmarks)
                 label = classify_sign(hand_landmarks.landmark)
                 states = _finger_states(hand_landmarks.landmark)
                 self.last_labels.append(label)
@@ -175,18 +191,9 @@ class HandSignProcessor(VideoProcessorBase):
                 if not label:
                     continue
                 y = 30 + idx * 30
-                cv2.putText(
-                    img,
-                    f"Hand {idx + 1}: {label}",
-                    (10, y),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.9,
-                    (255, 255, 255),
-                    2,
-                    cv2.LINE_AA,
-                )
+                _overlay_text(img, f"Hand {idx + 1}: {label}", y)
 
-        return av.VideoFrame.from_ndarray(img, format="bgr24")
+        return av.VideoFrame.from_ndarray(np.array(img), format="rgb24")
 
 
 st.subheader("Camera")
